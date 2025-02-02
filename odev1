@@ -1,0 +1,100 @@
+chest xray processing 
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import cv2
+import os
+from skimage import io, exposure, filters, morphology
+from skimage.color import rgb2gray
+from skimage.filters import try_all_threshold, threshold_otsu
+from skimage.measure import label, regionprops
+from skimage.morphology import disk, opening, closing
+
+# Dataset Paths
+dataset_path = "./chest_xray_dataset"
+image_files = os.listdir(dataset_path)
+
+# Load and Display Sample Images
+fig, axes = plt.subplots(3, 3, figsize=(10, 10))
+for i, ax in enumerate(axes.flat):
+    image = io.imread(os.path.join(dataset_path, image_files[i]), as_gray=True)
+    ax.imshow(image, cmap='gray')
+    ax.set_title(f"Image {i+1}")
+    ax.axis("off")
+plt.show()
+
+# Preprocessing: Crop Images
+def crop_image(image):
+    return image[20:-20, 20:-20]  # Example cropping to remove borders
+
+# Load, Crop, and Display Processed Images
+fig, axes = plt.subplots(3, 3, figsize=(10, 10))
+for i, ax in enumerate(axes.flat):
+    image = io.imread(os.path.join(dataset_path, image_files[i]), as_gray=True)
+    cropped = crop_image(image)
+    ax.imshow(cropped, cmap='gray')
+    ax.set_title(f"Cropped {i+1}")
+    ax.axis("off")
+plt.show()
+
+# Apply Contrast Enhancement (Histogram Equalization)
+def enhance_contrast(image):
+    return exposure.equalize_hist(image)
+
+# Visualize Enhanced Images
+fig, axes = plt.subplots(3, 3, figsize=(10, 10))
+for i, ax in enumerate(axes.flat):
+    image = io.imread(os.path.join(dataset_path, image_files[i]), as_gray=True)
+    enhanced = enhance_contrast(image)
+    ax.imshow(enhanced, cmap='gray')
+    ax.set_title(f"Enhanced {i+1}")
+    ax.axis("off")
+plt.show()
+
+# Apply Noise Reduction
+def apply_gaussian_blur(image):
+    return cv2.GaussianBlur(image, (5,5), 0)
+
+# Thresholding using Otsu's Method
+fig, axes = plt.subplots(3, 3, figsize=(10, 10))
+for i, ax in enumerate(axes.flat):
+    image = io.imread(os.path.join(dataset_path, image_files[i]), as_gray=True)
+    threshold = threshold_otsu(image)
+    binary = image > threshold
+    ax.imshow(binary, cmap='gray')
+    ax.set_title(f"Binary {i+1}")
+    ax.axis("off")
+plt.show()
+
+# Morphological Operations
+def morphological_operations(image):
+    selem = disk(3)
+    return closing(opening(image, selem), selem)
+
+# Connected Component Analysis
+def connected_component_analysis(image):
+    labeled_img = label(image)
+    props = regionprops(labeled_img)
+    return props
+
+# Processing Example Image
+sample_image = io.imread(os.path.join(dataset_path, image_files[0]), as_gray=True)
+binary_image = sample_image > threshold_otsu(sample_image)
+props = connected_component_analysis(binary_image)
+
+# Print Region Properties
+for i, prop in enumerate(props[:5]):
+    print(f"Region {i+1}: Area={prop.area}, Centroid={prop.centroid}")
+
+# Final Mask Application
+final_mask = morphological_operations(binary_image)
+final_result = sample_image * final_mask
+
+# Display Final Processed Image
+plt.figure(figsize=(8, 8))
+plt.imshow(final_result, cmap='gray')
+plt.title("Final Processed Image")
+plt.axis("off")
+plt.show()
